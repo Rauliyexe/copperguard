@@ -113,6 +113,9 @@ export const CameraAnalyticsScreen: React.FC<CameraAnalyticsScreenProps> = ({
   const [ptzFocus, setPtzFocus] = useState<number>(50); // 50% = 100% nítido (0px blur)
   const [ptzIris, setPtzIris] = useState<number>(50);   // 50% = exposição 1.0
   const [isMuted, setIsMuted] = useState(true);
+  const [invertControls, setInvertControls] = useState<boolean>(false); // Inversão opcional de eixos
+  const [isDraggingFeed, setIsDraggingFeed] = useState<boolean>(false);
+  const [ptzActionFeedback, setPtzActionFeedback] = useState<string | null>(null);
 
   // Período de gravação selecionado e exportação
   const [recordingPeriod, setRecordingPeriod] = useState('24h');
@@ -201,19 +204,47 @@ export const CameraAnalyticsScreen: React.FC<CameraAnalyticsScreenProps> = ({
     });
   }, [cameras, searchQuery, selectedSectorFilter]);
 
-  // Ações PTZ
+  const showPtzFeedback = (msg: string) => {
+    setPtzActionFeedback(msg);
+    setTimeout(() => setPtzActionFeedback(null), 1200);
+  };
+
+  // Ações PTZ (Controle de Navegação Direta de Câmeras CFTV)
   const handlePtzMove = (direction: 'UP' | 'DOWN' | 'LEFT' | 'RIGHT' | 'OK') => {
     soundAndVoice.playAlertSound('beep');
-    const step = 20;
-    if (direction === 'UP') setPtzPan(prev => ({ ...prev, y: Math.max(-100, prev.y - step) }));
-    if (direction === 'DOWN') setPtzPan(prev => ({ ...prev, y: Math.min(100, prev.y + step) }));
-    if (direction === 'LEFT') setPtzPan(prev => ({ ...prev, x: Math.max(-100, prev.x - step) }));
-    if (direction === 'RIGHT') setPtzPan(prev => ({ ...prev, x: Math.min(100, prev.x + step) }));
+    const step = 25;
+    const inv = invertControls ? -1 : 1;
+
+    if (direction === 'UP') {
+      // Mover para CIMA (em CSS, deslocar para cima é -Y)
+      setPtzPan(prev => ({ ...prev, y: Math.max(-120, Math.min(120, prev.y - (step * inv))) }));
+      setPtzZoom(z => (z === 1.0 ? 1.15 : z));
+      showPtzFeedback(inv === 1 ? 'TILT CIMA ↑' : 'TILT BAIXO ↓');
+    }
+    if (direction === 'DOWN') {
+      // Mover para BAIXO (em CSS, deslocar para baixo é +Y)
+      setPtzPan(prev => ({ ...prev, y: Math.max(-120, Math.min(120, prev.y + (step * inv))) }));
+      setPtzZoom(z => (z === 1.0 ? 1.15 : z));
+      showPtzFeedback(inv === 1 ? 'TILT BAIXO ↓' : 'TILT CIMA ↑');
+    }
+    if (direction === 'LEFT') {
+      // Mover para a ESQUERDA (em CSS, deslocar para a esquerda é -X)
+      setPtzPan(prev => ({ ...prev, x: Math.max(-120, Math.min(120, prev.x - (step * inv))) }));
+      setPtzZoom(z => (z === 1.0 ? 1.15 : z));
+      showPtzFeedback(inv === 1 ? 'PAN ESQUERDA ←' : 'PAN DIREITA →');
+    }
+    if (direction === 'RIGHT') {
+      // Mover para a DIREITA (em CSS, deslocar para a direita é +X)
+      setPtzPan(prev => ({ ...prev, x: Math.max(-120, Math.min(120, prev.x + (step * inv))) }));
+      setPtzZoom(z => (z === 1.0 ? 1.15 : z));
+      showPtzFeedback(inv === 1 ? 'PAN DIREITA →' : 'PAN ESQUERDA ←');
+    }
     if (direction === 'OK') {
       setPtzPan({ x: 0, y: 0 });
       setPtzZoom(1.0);
       setPtzFocus(50);
       setPtzIris(50);
+      showPtzFeedback('HOME (CENTRO 1.0x)');
     }
     const apiAction = direction === 'UP' ? 'TILT_UP' : direction === 'DOWN' ? 'TILT_DOWN' : direction === 'LEFT' ? 'PAN_LEFT' : direction === 'RIGHT' ? 'PAN_RIGHT' : 'PRESET_HOME';
     copperGuardApi.sendPtzCommand(selectedCam.id, apiAction);
@@ -224,9 +255,70 @@ export const CameraAnalyticsScreen: React.FC<CameraAnalyticsScreenProps> = ({
     setPtzZoom(prev => {
       const next = Math.max(1.0, Math.min(4.0, Number((prev + delta).toFixed(1))));
       copperGuardApi.sendPtzCommand(selectedCam.id, delta > 0 ? 'ZOOM_IN' : 'ZOOM_OUT');
+      showPtzFeedback(`ZOOM: ${next}x`);
       return next;
     });
   };
+
+  // Controle de arrasto com mouse diretamente sobre o vídeo
+  const handleFeedMouseDown = (_e: React.MouseEvent) => {
+    setIsDraggingFeed(true);
+  };
+
+  const handleFeedMouseMove = (e: React.MouseEvent) => {
+    if (!isDraggingFeed) return;
+    const inv = invertControls ? -1 : 1;
+    setPtzPan(prev => ({
+      x: Math.max(-120, Math.min(120, prev.x + (e.movementX * inv))),
+      y: Math.max(-120, Math.min(120, prev.y + (e.movementY * inv)))
+    }));
+    setPtzZoom(z => (z === 1.0 ? 1.15 : z));
+  };
+
+  const handleFeedMouseUp = () => {
+    setIsDraggingFeed(false);
+  };
+
+  const handleFeedWheel = (e: React.WheelEvent) => {
+    const delta = e.deltaY < 0 ? 0.2 : -0.2;
+    handlePtzZoomChange(delta);
+  };
+
+  // Navegação PTZ por teclado (Setas, +, -, Espaço/R)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const activeTag = document.activeElement?.tagName.toLowerCase();
+      if (activeTag === 'input' || activeTag === 'textarea' || activeTag === 'select') {
+        return;
+      }
+
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        handlePtzMove('UP');
+      } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        handlePtzMove('DOWN');
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        handlePtzMove('LEFT');
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        handlePtzMove('RIGHT');
+      } else if (e.key === ' ' || e.key === 'Home' || e.key === 'r' || e.key === 'R') {
+        e.preventDefault();
+        handlePtzMove('OK');
+      } else if (e.key === '+' || e.key === '=') {
+        e.preventDefault();
+        handlePtzZoomChange(0.2);
+      } else if (e.key === '-' || e.key === '_') {
+        e.preventDefault();
+        handlePtzZoomChange(-0.2);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [invertControls, selectedCam.id]);
 
   // Exportar clipe de segurança
   const handleExportClip = async () => {
@@ -843,17 +935,33 @@ export const CameraAnalyticsScreen: React.FC<CameraAnalyticsScreenProps> = ({
               </div>
 
               {/* Feed com Transformação PTZ e Filtros Reais de Foco e Íris */}
-              <div className="flex-1 min-h-0 relative bg-black overflow-hidden group">
+              <div
+                className="flex-1 min-h-0 relative bg-black overflow-hidden group cursor-grab active:cursor-grabbing select-none"
+                onMouseDown={handleFeedMouseDown}
+                onMouseMove={handleFeedMouseMove}
+                onMouseUp={handleFeedMouseUp}
+                onMouseLeave={handleFeedMouseUp}
+                onWheel={handleFeedWheel}
+                title="Clique e arraste para movimentar a câmera • Roda do mouse para Zoom"
+              >
                 <img
                   src={getCameraImage(selectedCam.id)}
                   alt={selectedCam.nome}
-                  className="w-full h-full object-cover transition-transform duration-150"
+                  className="w-full h-full object-cover transition-transform duration-100 pointer-events-none"
                   style={{
                     transform: `scale(${ptzZoom}) translate(${ptzPan.x}px, ${ptzPan.y}px)`,
                     transformOrigin: 'center center',
                     filter: `blur(${Math.abs(50 - ptzFocus) / 12}px) brightness(${0.4 + (ptzIris / 100) * 0.9})`
                   }}
                 />
+
+                {/* Badge OSD de Ação PTZ em Tempo Real */}
+                {ptzActionFeedback && (
+                  <div className="absolute top-12 left-1/2 -translate-x-1/2 z-20 bg-black/85 border border-emerald-500/60 text-emerald-300 font-mono text-[11px] font-bold px-3 py-1 rounded-full shadow-lg pointer-events-none flex items-center gap-1.5 animate-fadeIn">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#00FF88] animate-pulse" />
+                    <span>{ptzActionFeedback}</span>
+                  </div>
+                )}
 
                 {/* Efeito Iluminação do Holofote LED */}
                 {selectedCam.holofoteLigado && (
@@ -869,16 +977,16 @@ export const CameraAnalyticsScreen: React.FC<CameraAnalyticsScreenProps> = ({
                   </div>
                 )}
 
-                {/* Retículo / Crosshair Central de Mira PTZ */}
+                {/* Retículo / Crosshair Central de Mira PTZ - Fixo no centro óptico da câmera */}
                 <div
-                  className="absolute pointer-events-none transition-transform duration-150"
+                  className="absolute pointer-events-none transition-opacity duration-150"
                   style={{
                     top: '50%',
                     left: '50%',
-                    transform: `translate(calc(-50% + ${ptzPan.x}px), calc(-50% + ${ptzPan.y}px))`
+                    transform: 'translate(-50%, -50%)'
                   }}
                 >
-                  <Crosshair className="w-8 h-8 text-emerald-400/40 opacity-70" />
+                  <Crosshair className="w-8 h-8 text-emerald-400/50 opacity-80" />
                 </div>
 
                 {/* Relógio Digital no Canto Superior Direito */}
@@ -992,9 +1100,46 @@ export const CameraAnalyticsScreen: React.FC<CameraAnalyticsScreenProps> = ({
                   <Sliders className="w-3.5 h-3.5 text-emerald-400" />
                   <span>Controle PTZ</span>
                 </span>
-                <span className="text-[10px] text-emerald-400 font-bold">
-                  {selectedCam.id}
-                </span>
+                
+                <div className="flex items-center gap-1.5">
+                  {/* Seletor Segmentado de Modo de Eixos PTZ */}
+                  <div className="flex items-center gap-1 bg-[#070F0B] p-0.5 rounded-lg border border-[#16291E] text-[10px]">
+                    <button
+                      onClick={() => {
+                        setInvertControls(false);
+                        soundAndVoice.playAlertSound('beep');
+                        showPtzFeedback('EIXOS: MODO DIRETO');
+                      }}
+                      className={`px-2 py-0.5 rounded font-bold transition-all cursor-pointer ${
+                        !invertControls
+                          ? 'bg-emerald-500 text-black shadow-sm'
+                          : 'text-gray-400 hover:text-white'
+                      }`}
+                      title="Movimento Direto: clicar na seta move a imagem diretamente para aquele lado"
+                    >
+                      Direto
+                    </button>
+                    <button
+                      onClick={() => {
+                        setInvertControls(true);
+                        soundAndVoice.playAlertSound('beep');
+                        showPtzFeedback('EIXOS: MODO INVERTIDO');
+                      }}
+                      className={`px-2 py-0.5 rounded font-bold transition-all cursor-pointer ${
+                        invertControls
+                          ? 'bg-amber-500 text-black shadow-sm'
+                          : 'text-gray-400 hover:text-white'
+                      }`}
+                      title="Movimento Invertido: simulação de rotação física da lente PTZ / drone"
+                    >
+                      Invertido
+                    </button>
+                  </div>
+
+                  <span className="text-[10px] text-emerald-400 font-bold">
+                    {selectedCam.id}
+                  </span>
+                </div>
               </div>
 
               {/* D-Pad Circular Industrial com Coordenadas */}
@@ -1004,7 +1149,7 @@ export const CameraAnalyticsScreen: React.FC<CameraAnalyticsScreenProps> = ({
                   <button
                     onClick={() => handlePtzMove('UP')}
                     className="absolute top-1 p-2 rounded-full hover:bg-emerald-500/20 text-gray-400 hover:text-emerald-300 transition-colors cursor-pointer"
-                    title="Inclinar para Cima (Tilt Up)"
+                    title="Inclinar para Cima (Tilt Up • Seta ↑)"
                   >
                     <ChevronUp className="w-5 h-5" />
                   </button>
@@ -1013,7 +1158,7 @@ export const CameraAnalyticsScreen: React.FC<CameraAnalyticsScreenProps> = ({
                   <button
                     onClick={() => handlePtzMove('LEFT')}
                     className="absolute left-1 p-2 rounded-full hover:bg-emerald-500/20 text-gray-400 hover:text-emerald-300 transition-colors cursor-pointer"
-                    title="Panorâmica para Esquerda (Pan Left)"
+                    title="Panorâmica para Esquerda (Pan Left • Seta ←)"
                   >
                     <ChevronLeft className="w-5 h-5" />
                   </button>
@@ -1022,7 +1167,7 @@ export const CameraAnalyticsScreen: React.FC<CameraAnalyticsScreenProps> = ({
                   <button
                     onClick={() => handlePtzMove('OK')}
                     className="w-12 h-12 rounded-full bg-[#0E1A14] border border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/20 font-mono font-bold text-xs flex items-center justify-center shadow-md transition-all cursor-pointer"
-                    title="Redefinir Posição Home / Zoom 1.0x"
+                    title="Redefinir Posição Home / Zoom 1.0x (Tecla R / Espaço)"
                   >
                     OK
                   </button>
@@ -1031,7 +1176,7 @@ export const CameraAnalyticsScreen: React.FC<CameraAnalyticsScreenProps> = ({
                   <button
                     onClick={() => handlePtzMove('RIGHT')}
                     className="absolute right-1 p-2 rounded-full hover:bg-emerald-500/20 text-gray-400 hover:text-emerald-300 transition-colors cursor-pointer"
-                    title="Panorâmica para Direita (Pan Right)"
+                    title="Panorâmica para Direita (Pan Right • Seta →)"
                   >
                     <ChevronRight className="w-5 h-5" />
                   </button>
@@ -1040,16 +1185,19 @@ export const CameraAnalyticsScreen: React.FC<CameraAnalyticsScreenProps> = ({
                   <button
                     onClick={() => handlePtzMove('DOWN')}
                     className="absolute bottom-1 p-2 rounded-full hover:bg-emerald-500/20 text-gray-400 hover:text-emerald-300 transition-colors cursor-pointer"
-                    title="Inclinar para Baixo (Tilt Down)"
+                    title="Inclinar para Baixo (Tilt Down • Seta ↓)"
                   >
                     <ChevronDown className="w-5 h-5" />
                   </button>
                 </div>
 
                 <div className="font-mono text-[10px] text-gray-400 flex items-center gap-3">
-                  <span>PAN: <strong className="text-emerald-400">{(ptzPan.x / 3).toFixed(0)}°</strong></span>
+                  <span>PAN: <strong className="text-emerald-400">{(ptzPan.x / 3).toFixed(0)}° {ptzPan.x > 0 ? '(D)' : ptzPan.x < 0 ? '(E)' : ''}</strong></span>
                   <span>•</span>
-                  <span>TILT: <strong className="text-emerald-400">{(-ptzPan.y / 3).toFixed(0)}°</strong></span>
+                  <span>TILT: <strong className="text-emerald-400">{(-ptzPan.y / 3).toFixed(0)}° {ptzPan.y < 0 ? '(↑)' : ptzPan.y > 0 ? '(↓)' : ''}</strong></span>
+                </div>
+                <div className="text-[9px] text-gray-500 font-mono text-center">
+                  Setas ↑↓←→ • Arraste o vídeo com o mouse • R/Espaço para reset
                 </div>
               </div>
 
