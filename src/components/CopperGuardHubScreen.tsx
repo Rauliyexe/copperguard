@@ -82,9 +82,9 @@ export const CopperGuardHubScreen: React.FC<CopperGuardHubScreenProps> = ({ onEn
       <CopperOSTopHeader />
 
       {/* Área Central com Apenas Módulos de Segurança */}
-      <main className="flex-1 w-full max-w-[1400px] mx-auto px-4 sm:px-8 py-6 sm:py-8 space-y-6">
+      <main className="flex-1 w-full max-w-[1400px] mx-auto px-3.5 sm:px-8 py-4 sm:py-8 space-y-4 sm:space-y-6">
         {/* Cabeçalho de Boas-vindas */}
-        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 sm:gap-4">
           <div>
             {/* Pill de Status */}
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#0E1A14] border border-emerald-900/60 text-emerald-400 font-mono text-[10px] font-bold">
@@ -93,7 +93,7 @@ export const CopperGuardHubScreen: React.FC<CopperGuardHubScreenProps> = ({ onEn
             </div>
 
             {/* Título Principal */}
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight mt-2.5">
+            <h1 className="text-xl sm:text-3xl font-extrabold text-white tracking-tight mt-2 sm:mt-2.5">
               Painel de Segurança, <span className="text-[#00FF88] underline decoration-emerald-500/40 decoration-2 underline-offset-4">CopperGuard.</span>
             </h1>
             <p className="text-xs sm:text-sm text-gray-400 mt-1">
@@ -108,7 +108,7 @@ export const CopperGuardHubScreen: React.FC<CopperGuardHubScreenProps> = ({ onEn
         </div>
 
         {/* Grade de Módulos de Segurança Exclusivos (Padrão de Cartões CopperOS) */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
           {COPPERGUARD_SECURITY_MODULES.map((mod) => {
             const Icon = mod.icon;
 
@@ -119,7 +119,7 @@ export const CopperGuardHubScreen: React.FC<CopperGuardHubScreenProps> = ({ onEn
                   soundAndVoice.playAlertSound('beep');
                   onEnterModule(mod.id);
                 }}
-                className="group relative flex flex-col justify-between p-5 rounded-2xl bg-[#0A140F] border border-[#16291E] hover:border-emerald-500/60 hover:bg-[#0E1A14] transition-all duration-200 cursor-pointer shadow-sm hover:shadow-[0_0_24px_rgba(16,185,129,0.15)] hover:-translate-y-0.5"
+                className="group relative flex flex-col justify-between p-4 sm:p-5 rounded-2xl bg-[#0A140F] border border-[#16291E] hover:border-emerald-500/60 hover:bg-[#0E1A14] transition-all duration-200 cursor-pointer shadow-sm hover:shadow-[0_0_24px_rgba(16,185,129,0.15)] active:scale-[0.98]"
               >
                 {/* Linha Superior: Caixa do Ícone (Esquerda) + Pílula de Categoria (Direita) */}
                 <div className="flex items-center justify-between">

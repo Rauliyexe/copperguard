@@ -62,20 +62,20 @@ export const GatesControlScreen: React.FC<GatesControlScreenProps> = ({
   const totalTravados = portoes.filter(p => p.status !== 'ABERTO').length;
 
   return (
-    <div className="w-full h-full bg-[#040A07] p-4 flex flex-col justify-between overflow-hidden select-none">
+    <div className="w-full h-full bg-[#040A07] p-2.5 sm:p-4 flex flex-col justify-between overflow-y-auto select-none font-sans text-slate-100">
       {/* =====================================================================
           BARRA SUPERIOR: CONTROLE CENTRAL DE PORTÕES, CANCELAS & ECLUSAS
          ===================================================================== */}
-      <div className="flex items-center justify-between flex-wrap gap-3 bg-night-950/90 border border-night-800 rounded-2xl px-4 py-2.5 shadow-xl shrink-0">
-        <div className="flex items-center space-x-3">
+      <div className="flex items-center justify-between flex-wrap gap-2.5 bg-night-950/90 border border-night-800 rounded-2xl px-3 sm:px-4 py-2.5 shadow-xl shrink-0">
+        <div className="flex items-center space-x-2 sm:space-x-3 flex-wrap gap-2">
           <div className="flex items-center space-x-2">
-            <KeyRound className="w-4 h-4 text-sky-400" />
+            <KeyRound className="w-4 h-4 text-sky-400 shrink-0" />
             <span className="font-mono font-bold text-xs text-white uppercase tracking-wider">
-              Controle Remoto de Portões, Cancelas &amp; Eclusas
+              Portões &amp; Eclusas
             </span>
           </div>
 
-          <div className="flex items-center bg-night-900 p-1 rounded-xl border border-night-800 text-xs font-mono">
+          <div className="flex items-center bg-night-900 p-0.5 sm:p-1 rounded-xl border border-night-800 text-[11px] sm:text-xs font-mono overflow-x-auto no-scrollbar">
             {(['TODAS', 'LESTE', 'OESTE'] as const).map(f => (
               <button
                 key={f}
@@ -83,30 +83,30 @@ export const GatesControlScreen: React.FC<GatesControlScreenProps> = ({
                   setFilterQuadra(f);
                   soundAndVoice.playAlertSound('beep');
                 }}
-                className={`px-3 py-1 rounded-lg transition-all ${
+                className={`px-2 sm:px-3 py-1 rounded-lg transition-all shrink-0 cursor-pointer ${
                   filterQuadra === f
                     ? 'bg-brand-500 text-night-950 font-bold'
                     : 'text-gray-400 hover:text-white'
                 }`}
               >
-                {f === 'TODAS' && `Todas as Quadras (${portoes.length})`}
-                {f === 'LESTE' && 'Quadra Leste (Galpões)'}
-                {f === 'OESTE' && 'Quadra Oeste (Sede Admin)'}
+                {f === 'TODAS' && `Todas (${portoes.length})`}
+                {f === 'LESTE' && 'Galpões'}
+                {f === 'OESTE' && 'Sede'}
               </button>
             ))}
           </div>
         </div>
 
-        <div className="flex items-center space-x-3 text-xs font-mono">
-          <div className="px-3 py-1.5 rounded-xl bg-night-900 border border-night-800 flex items-center space-x-2">
-            <Unlock className="w-3.5 h-3.5 text-amber-400" />
-            <span className="text-gray-400">Abertos:</span>
+        <div className="flex items-center space-x-2 sm:space-x-3 text-xs font-mono flex-wrap gap-1.5">
+          <div className="px-2.5 py-1 sm:py-1.5 rounded-xl bg-night-900 border border-night-800 flex items-center space-x-1.5 text-[11px] sm:text-xs">
+            <Unlock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+            <span className="text-gray-400 hidden xs:inline">Abertos:</span>
             <span className="text-amber-300 font-bold">{totalAbertos}</span>
           </div>
 
-          <div className="px-3 py-1.5 rounded-xl bg-night-900 border border-night-800 flex items-center space-x-2">
-            <Lock className="w-3.5 h-3.5 text-emerald-400" />
-            <span className="text-gray-400">Travados / Eclusa:</span>
+          <div className="px-2.5 py-1 sm:py-1.5 rounded-xl bg-night-900 border border-night-800 flex items-center space-x-1.5 text-[11px] sm:text-xs">
+            <Lock className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+            <span className="text-gray-400 hidden xs:inline">Travados:</span>
             <span className="text-emerald-400 font-bold">{totalTravados}</span>
           </div>
 
@@ -120,10 +120,10 @@ export const GatesControlScreen: React.FC<GatesControlScreenProps> = ({
                 );
               }
             }}
-            className="px-3.5 py-1.5 rounded-xl bg-rose-600/20 hover:bg-rose-600/35 border border-rose-500/60 text-rose-200 font-bold flex items-center space-x-1.5 transition-all"
+            className="px-3 py-1.5 rounded-xl bg-rose-600/20 hover:bg-rose-600/35 border border-rose-500/60 text-rose-200 font-bold flex items-center space-x-1.5 transition-all cursor-pointer active:scale-95 text-[11px] sm:text-xs"
           >
-            <ShieldAlert className="w-3.5 h-3.5 text-rose-400" />
-            <span>Travar Todos (Lockdown)</span>
+            <ShieldAlert className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+            <span>Lockdown Geral</span>
           </button>
         </div>
       </div>
@@ -131,9 +131,9 @@ export const GatesControlScreen: React.FC<GatesControlScreenProps> = ({
       {/* =====================================================================
           CORPO CENTRAL: LISTA DE PORTÕES (ESQUERDA) + MONITOR E AUDITORIA (DIREITA)
          ===================================================================== */}
-      <div className="flex-1 min-h-0 mt-3 grid grid-cols-12 gap-4">
-        {/* COLUNA ESQUERDA (7 cols): Cartões de Acionamento Remoto dos 5 Portões/Eclusas Reais */}
-        <div className="col-span-7 bg-night-950/90 border border-night-800 rounded-2xl p-4 flex flex-col justify-between overflow-y-auto">
+      <div className="flex-1 min-h-0 mt-3 grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-4 overflow-y-auto lg:overflow-hidden">
+        {/* COLUNA ESQUERDA (7 cols no desktop, 1 col no mobile): Cartões de Acionamento Remoto dos Portões */}
+        <div className="col-span-1 lg:col-span-7 bg-night-950/90 border border-night-800 rounded-2xl p-3 sm:p-4 flex flex-col justify-between overflow-y-auto">
           <div className="space-y-3">
             <div className="flex items-center justify-between border-b border-night-800 pb-2.5">
               <div>
@@ -262,8 +262,8 @@ export const GatesControlScreen: React.FC<GatesControlScreenProps> = ({
           </div>
         </div>
 
-        {/* COLUNA DIREITA (5 cols): Câmera Vinculada ao Portão + Log de Auditoria de Acionamentos */}
-        <div className="col-span-5 flex flex-col gap-4 min-h-0">
+        {/* COLUNA DIREITA (5 cols no desktop, 1 col no mobile): Câmera Vinculada ao Portão + Log de Auditoria */}
+        <div className="col-span-1 lg:col-span-5 flex flex-col gap-3 sm:gap-4 min-h-0">
           {/* Monitor de Vídeo da Câmera do Portão Selecionado */}
           <div className="bg-night-950/90 border border-night-800 rounded-2xl p-3.5 flex flex-col space-y-2.5">
             <div className="flex items-center justify-between font-mono text-xs">

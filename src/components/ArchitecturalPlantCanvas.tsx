@@ -334,6 +334,32 @@ export const ArchitecturalPlantCanvas: React.FC<ArchitecturalPlantCanvasProps> =
     setIsDragging(false);
   };
 
+  // Suporte a Touch Dragging no mapa 2D em celulares
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+
+  const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (e.touches.length === 1) {
+      touchStartRef.current = {
+        x: e.touches[0].clientX - pan.x,
+        y: e.touches[0].clientY - pan.y
+      };
+      setIsDragging(true);
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (!isDragging || !touchStartRef.current || e.touches.length !== 1) return;
+    setPan({
+      x: e.touches[0].clientX - touchStartRef.current.x,
+      y: e.touches[0].clientY - touchStartRef.current.y
+    });
+  };
+
+  const handleTouchEnd = () => {
+    setIsDragging(false);
+    touchStartRef.current = null;
+  };
+
   // Foco Rápido de Câmera em um Setor Real da Planta
   const focusRoom = (targetX: number, targetY: number, targetZoom: number) => {
     setZoom(targetZoom);
@@ -389,6 +415,10 @@ export const ArchitecturalPlantCanvas: React.FC<ArchitecturalPlantCanvasProps> =
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      onTouchCancel={handleTouchEnd}
       style={{ backgroundColor: canvasBgHex }}
       className={`relative w-full h-full overflow-hidden select-none transition-colors duration-300 ${
         tool !== 'PAN' ? 'cursor-crosshair' : isDragging ? 'cursor-grabbing' : 'cursor-grab'
@@ -399,7 +429,8 @@ export const ArchitecturalPlantCanvas: React.FC<ArchitecturalPlantCanvasProps> =
          ===================================================================== */}
       <div
         onMouseDown={e => e.stopPropagation()}
-        className="absolute left-4 top-4 z-30 flex items-center flex-wrap gap-2 bg-night-950/90 backdrop-blur-md border border-night-700 p-2 rounded-xl shadow-2xl text-[11px] font-mono"
+        onTouchStart={e => e.stopPropagation()}
+        className="absolute left-2 sm:left-4 top-2 sm:top-4 z-30 flex items-center flex-wrap gap-1.5 sm:gap-2 bg-night-950/90 backdrop-blur-md border border-night-700 p-1.5 sm:p-2 rounded-xl shadow-2xl text-[10px] sm:text-[11px] font-mono max-w-[calc(100vw-1rem)]"
       >
         {/* Alternador CAD Tático vs Satélite Real */}
         <div className="flex items-center bg-night-900 p-0.5 rounded-lg border border-night-800">
@@ -513,11 +544,12 @@ export const ArchitecturalPlantCanvas: React.FC<ArchitecturalPlantCanvasProps> =
       </div>
 
       {/* =====================================================================
-          PAINEL FLUTUANTE DE ZOOM RÁPIDO POR SETOR REAL (SUPERIOR DIREITO)
+          PAINEL FLUTUANTE DE ZOOM RÁPIDO POR SETOR REAL (SUPERIOR DIREITO - DESKTOP)
          ===================================================================== */}
       <div
         onMouseDown={e => e.stopPropagation()}
-        className="absolute right-4 top-4 z-30 flex flex-col space-y-1.5 bg-night-950/90 backdrop-blur-md border border-night-700 p-2.5 rounded-xl shadow-2xl text-[11px] font-mono"
+        onTouchStart={e => e.stopPropagation()}
+        className="hidden md:flex absolute right-4 top-4 z-30 flex-col space-y-1.5 bg-night-950/90 backdrop-blur-md border border-night-700 p-2.5 rounded-xl shadow-2xl text-[11px] font-mono"
       >
         <div className="flex items-center justify-between px-2 pt-0.5">
           <span className="text-[9px] text-gray-400 uppercase font-bold tracking-wider">

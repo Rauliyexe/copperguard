@@ -287,42 +287,42 @@ export const CustomModularDashboard: React.FC<CustomModularDashboardProps> = ({
   };
 
   return (
-    <div className="w-full h-full bg-[#040A07] p-3.5 flex flex-col justify-between overflow-hidden select-none">
+    <div className="w-full h-full bg-[#040A07] p-2.5 sm:p-3.5 flex flex-col justify-between overflow-y-auto select-none font-sans text-slate-100">
       {/* =====================================================================
           BARRA SUPERIOR DE PERSONALIZAÇÃO & TEMPLATES
          ===================================================================== */}
-      <div className="flex items-center justify-between flex-wrap gap-2.5 bg-night-950/90 border border-night-800 rounded-2xl px-4 py-2.5 shadow-xl shrink-0">
-        <div className="flex items-center space-x-3">
+      <div className="flex items-center justify-between flex-wrap gap-2.5 bg-night-950/90 border border-night-800 rounded-2xl px-3 sm:px-4 py-2.5 shadow-xl shrink-0">
+        <div className="flex items-center space-x-2 sm:space-x-3">
           <div className="flex items-center space-x-2">
-            <LayoutGrid className="w-4 h-4 text-brand-400" />
+            <LayoutGrid className="w-4 h-4 text-brand-400 shrink-0" />
             <span className="font-mono font-bold text-xs text-white uppercase tracking-wider">
-              Cockpit Modular Customizável
+              Cockpit Modular
             </span>
           </div>
           <span className="text-[11px] font-mono text-gray-500">
-            • {widgets.length} blocos ativos
+            • {widgets.length} blocos
           </span>
         </div>
 
         {/* Ações de Layout & Adicionar Módulo */}
-        <div className="flex items-center space-x-2 text-xs font-mono">
-          <div className="flex items-center bg-night-900 px-2 py-1 rounded-xl border border-night-800 text-[11px] text-gray-400 space-x-1.5">
-            <span className="text-gray-500">Modelos:</span>
+        <div className="flex items-center flex-wrap gap-2 text-xs font-mono">
+          <div className="flex items-center bg-night-900 px-2 py-1 rounded-xl border border-night-800 text-[11px] text-gray-400 space-x-1.5 overflow-x-auto no-scrollbar">
+            <span className="text-gray-500 hidden sm:inline">Modelos:</span>
             <button
               onClick={() => handleApplyPreset('ACESSOS')}
-              className="px-2 py-0.5 rounded hover:bg-night-800 hover:text-white text-gray-300 transition-colors"
+              className="px-2 py-0.5 rounded hover:bg-night-800 hover:text-white text-gray-300 transition-colors shrink-0"
             >
-              Portões & Acessos
+              Portões
             </button>
             <button
               onClick={() => handleApplyPreset('SEGURANCA')}
-              className="px-2 py-0.5 rounded hover:bg-night-800 hover:text-white text-gray-300 transition-colors"
+              className="px-2 py-0.5 rounded hover:bg-night-800 hover:text-white text-gray-300 transition-colors shrink-0"
             >
               Segurança
             </button>
             <button
               onClick={() => handleApplyPreset('COMPLETO')}
-              className="px-2 py-0.5 rounded hover:bg-night-800 hover:text-white text-gray-300 transition-colors"
+              className="px-2 py-0.5 rounded hover:bg-night-800 hover:text-white text-gray-300 transition-colors shrink-0"
             >
               Padrão
             </button>
@@ -333,11 +333,11 @@ export const CustomModularDashboard: React.FC<CustomModularDashboardProps> = ({
               soundAndVoice.playAlertSound('beep');
               setWidgets(DEFAULT_MODULAR_WIDGETS);
             }}
-            className="px-2.5 py-1.5 rounded-xl bg-night-900 hover:bg-night-800 text-gray-400 hover:text-white border border-night-800 flex items-center space-x-1.5 transition-all"
+            className="px-2.5 py-1.5 rounded-xl bg-night-900 hover:bg-night-800 text-gray-400 hover:text-white border border-night-800 flex items-center space-x-1.5 transition-all text-xs"
             title="Resetar layout para o padrão"
           >
             <RotateCcw className="w-3.5 h-3.5" />
-            <span>Resetar</span>
+            <span className="hidden sm:inline">Resetar</span>
           </button>
 
           <button
@@ -345,10 +345,10 @@ export const CustomModularDashboard: React.FC<CustomModularDashboardProps> = ({
               soundAndVoice.playAlertSound('beep');
               setShowAddModal(true);
             }}
-            className="px-3.5 py-1.5 rounded-xl bg-brand-500 hover:bg-brand-400 text-night-950 font-bold flex items-center space-x-1.5 transition-all shadow-glow-brand"
+            className="px-3 py-1.5 rounded-xl bg-brand-500 hover:bg-brand-400 text-night-950 font-bold flex items-center space-x-1.5 transition-all shadow-glow-brand text-xs cursor-pointer active:scale-95"
           >
             <Plus className="w-4 h-4 stroke-[2.5]" />
-            <span>Adicionar Módulo</span>
+            <span>+ Módulo</span>
           </button>
         </div>
       </div>

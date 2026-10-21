@@ -937,7 +937,7 @@ export const AccessControlScreen: React.FC<AccessControlScreenProps> = ({
           FUNÇÃO 1: CATRACAS & PORTARIA AO VIVO (DEFAULT)
          ===================================================================== */}
       {currentMode === 'catracas-ao-vivo' && (
-        <div className="flex-1 min-h-0 grid grid-cols-12 gap-3 overflow-hidden">
+        <div className="flex-1 min-h-0 grid grid-cols-12 gap-3 overflow-y-auto lg:overflow-hidden">
           {/* COLUNA ESQUERDA (5 cols): FILA DE PRÉ-CHECKIN (APROVAÇÃO EXPRESSA) */}
           <div className="col-span-12 lg:col-span-5 bg-[#0A140F] border border-[#16291E] rounded-2xl p-3.5 flex flex-col justify-between overflow-hidden shadow-sm font-mono">
             <div className="flex-1 min-h-0 flex flex-col">
@@ -1208,7 +1208,7 @@ export const AccessControlScreen: React.FC<AccessControlScreenProps> = ({
           FUNÇÃO 2: COLABORADORES & SCANNER FACIAL 3D (COM WEBCAM / VIRTUAL)
          ===================================================================== */}
       {currentMode === 'colaboradores-facial' && (
-        <div className="flex-1 min-h-0 grid grid-cols-12 gap-3 overflow-hidden font-mono">
+        <div className="flex-1 min-h-0 grid grid-cols-12 gap-3 overflow-y-auto lg:overflow-hidden font-mono">
           {/* COLUNA ESQUERDA (5 cols): LISTA DE COLABORADORES */}
           <div className="col-span-12 lg:col-span-5 bg-[#0A140F] border border-[#16291E] rounded-2xl p-3.5 flex flex-col justify-between overflow-hidden shadow-sm">
             <div className="flex-1 min-h-0 flex flex-col">
@@ -2395,11 +2395,11 @@ export const AccessControlScreen: React.FC<AccessControlScreenProps> = ({
                 <span>Pronto para impressão em bobinas térmicas de 100mm ou impressoras de PVC.</span>
               </span>
 
-              <div className="flex items-center gap-2 w-full sm:w-auto">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
                 {/* Botão Copiar Dados */}
                 <button
                   onClick={() => handleCopyBadgeText(selectedVisitorForBadge)}
-                  className="px-3 py-2 rounded-xl bg-[#0A140F] hover:bg-[#16291E] border border-[#16291E] text-gray-300 hover:text-white font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                  className="px-3 py-2 rounded-xl bg-[#0A140F] hover:bg-[#16291E] border border-[#16291E] text-gray-300 hover:text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
                   title="Copiar dados da credencial"
                 >
                   <Copy className="w-3.5 h-3.5" />
@@ -2409,7 +2409,7 @@ export const AccessControlScreen: React.FC<AccessControlScreenProps> = ({
                 {/* Botão WhatsApp */}
                 <button
                   onClick={() => handleShareBadgeWhatsApp(selectedVisitorForBadge)}
-                  className="px-3.5 py-2 rounded-xl bg-[#0E1A14] hover:bg-[#16291E] border border-emerald-600/40 text-emerald-300 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                  className="px-3.5 py-2 rounded-xl bg-[#0E1A14] hover:bg-[#16291E] border border-emerald-600/40 text-emerald-300 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
                   title="Enviar comprovante para o WhatsApp do visitante"
                 >
                   <Share2 className="w-3.5 h-3.5 text-emerald-400" />
@@ -2419,10 +2419,10 @@ export const AccessControlScreen: React.FC<AccessControlScreenProps> = ({
                 {/* Botão Imprimir Principal (Chama window.print() sem sujeira) */}
                 <button
                   onClick={handlePrintBadge}
-                  className="flex-1 sm:flex-none px-5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(16,185,129,0.35)] transition-all cursor-pointer"
+                  className="flex-1 px-5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(16,185,129,0.35)] transition-all cursor-pointer"
                 >
                   <Printer className="w-4 h-4 stroke-[2.4]" />
-                  <span>IMPRIMIR CRACHÁ TÉRMICO (Ctrl+P)</span>
+                  <span>IMPRIMIR CRACHÁ TÉRMICO</span>
                 </button>
               </div>
             </div>

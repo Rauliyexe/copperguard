@@ -117,6 +117,12 @@ export const CameraAnalyticsScreen: React.FC<CameraAnalyticsScreenProps> = ({
   const [isDraggingFeed, setIsDraggingFeed] = useState<boolean>(false);
   const [ptzActionFeedback, setPtzActionFeedback] = useState<string | null>(null);
 
+  // Sub-aba no celular para alternar entre Controles PTZ, Câmeras/Setores e Gravações
+  const [mobileZoomTab, setMobileZoomTab] = useState<'PTZ' | 'SETORES' | 'GRAVACOES'>('PTZ');
+
+  // Suporte a Touch Gestures (arrastar feed com toque no celular)
+  const touchStartRef = React.useRef<{ x: number; y: number } | null>(null);
+
   // Período de gravação selecionado e exportação
   const [recordingPeriod, setRecordingPeriod] = useState('24h');
   const [isDownloadingClip, setIsDownloadingClip] = useState(false);
@@ -279,6 +285,38 @@ export const CameraAnalyticsScreen: React.FC<CameraAnalyticsScreenProps> = ({
     setIsDraggingFeed(false);
   };
 
+  // Suporte a Touch Dragging no feed de vídeo em celulares (Touch Events)
+  const handleFeedTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 1) {
+      touchStartRef.current = {
+        x: e.touches[0].clientX,
+        y: e.touches[0].clientY
+      };
+      setIsDraggingFeed(true);
+    }
+  };
+
+  const handleFeedTouchMove = (e: React.TouchEvent) => {
+    if (!isDraggingFeed || !touchStartRef.current || e.touches.length !== 1) return;
+    const currentX = e.touches[0].clientX;
+    const currentY = e.touches[0].clientY;
+    const deltaX = currentX - touchStartRef.current.x;
+    const deltaY = currentY - touchStartRef.current.y;
+    touchStartRef.current = { x: currentX, y: currentY };
+
+    const inv = invertControls ? -1 : 1;
+    setPtzPan(prev => ({
+      x: Math.max(-120, Math.min(120, prev.x + (deltaX * inv))),
+      y: Math.max(-120, Math.min(120, prev.y + (deltaY * inv)))
+    }));
+    setPtzZoom(z => (z === 1.0 ? 1.15 : z));
+  };
+
+  const handleFeedTouchEnd = () => {
+    setIsDraggingFeed(false);
+    touchStartRef.current = null;
+  };
+
   const handleFeedWheel = (e: React.WheelEvent) => {
     const delta = e.deltaY < 0 ? 0.2 : -0.2;
     handlePtzZoomChange(delta);
@@ -375,6 +413,372 @@ export const CameraAnalyticsScreen: React.FC<CameraAnalyticsScreenProps> = ({
     setApiTestResult(result.message);
     setApiConfig(copperGuardApi.getConfig());
   };
+
+  // =========================================================================
+  // PAINÉIS MODULARES PARA USO RESPONSIVO DESKTOP E MOBILE
+  // =========================================================================
+
+  // Painel de Setores, Busca e Status
+  const renderSectorsPanel = () => (
+    <div className="rounded-2xl bg-[#0A140F] border border-[#16291E] p-3 flex flex-col justify-between overflow-hidden shadow-sm h-full w-full">
+      <div className="space-y-2.5 flex-1 min-h-0 flex flex-col">
+        {/* Campo de Busca com Botão de Limpar */}
+        <div className="relative shrink-0">
+          <Search className="w-3.5 h-3.5 text-gray-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            placeholder="Buscar câmera..."
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            className="w-full pl-8 pr-7 py-1.5 bg-[#070F0B] border border-[#16291E] rounded-xl text-xs font-mono text-gray-200 placeholder-gray-600 outline-none focus:border-emerald-500/60"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          )}
+        </div>
+
+        {/* Lista Interativa de Setores */}
+        <div className="flex-1 min-h-0 overflow-y-auto space-y-1 pr-1 font-mono text-xs max-h-56 md:max-h-none">
+          {sectorsList.map(sec => {
+            const SecIcon = sec.icon;
+            const isSelected = selectedSectorFilter === sec.id;
+
+            return (
+              <button
+                key={sec.id}
+                onClick={() => {
+                  soundAndVoice.playAlertSound('beep');
+                  setSelectedSectorFilter(isSelected ? 'TODOS' : sec.id);
+                  const inSector = cameras.find(c => sec.id === 'TODOS' || getCameraSectorCategory(c) === sec.id);
+                  if (inSector) onSelectCamera(inSector.id);
+                }}
+                className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs transition-all cursor-pointer ${
+                  isSelected
+                    ? 'bg-emerald-950/60 text-emerald-300 font-bold border border-emerald-700/60 shadow-[0_0_10px_rgba(16,185,129,0.2)]'
+                    : 'text-gray-300 hover:text-white hover:bg-[#0E1A14] border border-transparent'
+                }`}
+              >
+                <div className="flex items-center gap-2 truncate">
+                  <SecIcon className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  <span className="truncate">{sec.label}</span>
+                </div>
+                <span className="text-[10px] bg-[#070F0B] border border-[#16291E] px-1.5 py-0.2 rounded font-mono text-gray-400 shrink-0">
+                  {sec.count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Status da Planta */}
+      <div className="pt-2.5 border-t border-[#16291E] space-y-1.5 shrink-0 font-mono text-[11px] mt-2">
+        <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block px-1">
+          Status da Infraestrutura
+        </span>
+        <div className="flex items-center justify-between px-1 text-gray-300">
+          <span className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-emerald-400" />
+            <span>Câmeras Online</span>
+          </span>
+          <span className="font-bold text-emerald-400">
+            {cameras.filter(c => c.status === 'ONLINE').length}
+          </span>
+        </div>
+        <div className="flex items-center justify-between px-1 text-gray-300">
+          <span className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-rose-500" />
+            <span>Alertas / Invasão</span>
+          </span>
+          <span className="font-bold text-rose-400">
+            {cameras.filter(c => c.status === 'ALERTA').length}
+          </span>
+        </div>
+        <div className="flex items-center justify-between px-1 text-gray-300">
+          <span className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-gray-500" />
+            <span>API REST</span>
+          </span>
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] text-emerald-400 font-bold">
+              {apiConfig.status}
+            </span>
+            <button
+              onClick={() => setShowApiModal(true)}
+              className="p-1 rounded hover:bg-[#16291E] text-gray-400 hover:text-emerald-400 transition-colors cursor-pointer"
+              title="Configurações da API REST & NVR"
+            >
+              <Server className="w-3 h-3" />
+            </button>
+          </div>
+        </div>
+
+        <button
+          onClick={() => setShowAddModal(true)}
+          className="w-full mt-1 py-1.5 rounded-xl bg-[#0E1A14] hover:bg-[#16291E] border border-emerald-800/40 text-emerald-300 text-[10px] font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+        >
+          <Plus className="w-3 h-3" />
+          <span>Alocar Câmera</span>
+        </button>
+      </div>
+    </div>
+  );
+
+  // Painel de Controle PTZ
+  const renderPtzConsolePanel = () => (
+    <div className="rounded-2xl bg-[#0A140F] border border-[#16291E] p-3.5 sm:p-4 flex flex-col items-center justify-between space-y-4 shadow-sm w-full">
+      <div className="w-full flex items-center justify-between border-b border-[#16291E] pb-2 font-mono text-xs">
+        <span className="font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+          <Sliders className="w-3.5 h-3.5 text-emerald-400" />
+          <span>Controle PTZ</span>
+        </span>
+        
+        <div className="flex items-center gap-1.5">
+          {/* Seletor Segmentado de Modo de Eixos PTZ */}
+          <div className="flex items-center gap-1 bg-[#070F0B] p-0.5 rounded-lg border border-[#16291E] text-[10px]">
+            <button
+              onClick={() => {
+                setInvertControls(false);
+                soundAndVoice.playAlertSound('beep');
+                showPtzFeedback('EIXOS: MODO DIRETO');
+              }}
+              className={`px-2 py-0.5 rounded font-bold transition-all cursor-pointer ${
+                !invertControls
+                  ? 'bg-emerald-500 text-black shadow-sm'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+              title="Movimento Direto: clicar na seta move a imagem diretamente para aquele lado"
+            >
+              Direto
+            </button>
+            <button
+              onClick={() => {
+                setInvertControls(true);
+                soundAndVoice.playAlertSound('beep');
+                showPtzFeedback('EIXOS: MODO INVERTIDO');
+              }}
+              className={`px-2 py-0.5 rounded font-bold transition-all cursor-pointer ${
+                invertControls
+                  ? 'bg-amber-500 text-black shadow-sm'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+              title="Movimento Invertido: simulação de rotação física da lente PTZ / drone"
+            >
+              Invertido
+            </button>
+          </div>
+
+          <span className="text-[10px] text-emerald-400 font-bold">
+            {selectedCam.id}
+          </span>
+        </div>
+      </div>
+
+      {/* D-Pad Circular Industrial com Coordenadas */}
+      <div className="flex flex-col items-center gap-1.5">
+        <div className="relative w-36 h-36 rounded-full border-2 border-[#16291E] bg-[#070F0B] flex items-center justify-center shadow-inner">
+          {/* Cima */}
+          <button
+            onClick={() => handlePtzMove('UP')}
+            className="absolute top-1 p-2 rounded-full hover:bg-emerald-500/20 text-gray-400 hover:text-emerald-300 transition-colors cursor-pointer active:scale-95"
+            title="Inclinar para Cima (Tilt Up • Seta ↑)"
+          >
+            <ChevronUp className="w-5 h-5" />
+          </button>
+
+          {/* Esquerda */}
+          <button
+            onClick={() => handlePtzMove('LEFT')}
+            className="absolute left-1 p-2 rounded-full hover:bg-emerald-500/20 text-gray-400 hover:text-emerald-300 transition-colors cursor-pointer active:scale-95"
+            title="Panorâmica para Esquerda (Pan Left • Seta ←)"
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+
+          {/* Botão Central OK (Home Preset) */}
+          <button
+            onClick={() => handlePtzMove('OK')}
+            className="w-12 h-12 rounded-full bg-[#0E1A14] border border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/20 font-mono font-bold text-xs flex items-center justify-center shadow-md transition-all cursor-pointer active:scale-95"
+            title="Redefinir Posição Home / Zoom 1.0x (Tecla R / Espaço)"
+          >
+            OK
+          </button>
+
+          {/* Direita */}
+          <button
+            onClick={() => handlePtzMove('RIGHT')}
+            className="absolute right-1 p-2 rounded-full hover:bg-emerald-500/20 text-gray-400 hover:text-emerald-300 transition-colors cursor-pointer active:scale-95"
+            title="Panorâmica para Direita (Pan Right • Seta →)"
+          >
+            <ChevronRight className="w-5 h-5" />
+          </button>
+
+          {/* Baixo */}
+          <button
+            onClick={() => handlePtzMove('DOWN')}
+            className="absolute bottom-1 p-2 rounded-full hover:bg-emerald-500/20 text-gray-400 hover:text-emerald-300 transition-colors cursor-pointer active:scale-95"
+            title="Inclinar para Baixo (Tilt Down • Seta ↓)"
+          >
+            <ChevronDown className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="font-mono text-[10px] text-gray-400 flex items-center gap-3">
+          <span>PAN: <strong className="text-emerald-400">{(ptzPan.x / 3).toFixed(0)}° {ptzPan.x > 0 ? '(D)' : ptzPan.x < 0 ? '(E)' : ''}</strong></span>
+          <span>•</span>
+          <span>TILT: <strong className="text-emerald-400">{(-ptzPan.y / 3).toFixed(0)}° {ptzPan.y < 0 ? '(↑)' : ptzPan.y > 0 ? '(↓)' : ''}</strong></span>
+        </div>
+        <div className="text-[9px] text-gray-500 font-mono text-center">
+          Toque e arraste o vídeo com o dedo • Toque nas setas • Botão OK para Home
+        </div>
+      </div>
+
+      {/* Sliders Reais de Zoom, Foco e Íris */}
+      <div className="w-full space-y-2.5 font-mono text-xs">
+        {/* Zoom */}
+        <div className="p-2 rounded-xl bg-[#070F0B] border border-[#16291E] space-y-1">
+          <div className="flex items-center justify-between text-[11px]">
+            <span className="text-gray-400">Zoom Digital:</span>
+            <strong className="text-emerald-400">{ptzZoom}x</strong>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => handlePtzZoomChange(-0.5)}
+              className="px-2.5 py-1 rounded-lg bg-[#0E1A14] hover:bg-[#16291E] text-gray-300 font-bold active:scale-95"
+            >
+              -
+            </button>
+            <input
+              type="range"
+              min="1.0"
+              max="4.0"
+              step="0.1"
+              value={ptzZoom}
+              onChange={e => {
+                setPtzZoom(Number(e.target.value));
+                copperGuardApi.sendPtzCommand(selectedCam.id, 'ZOOM_IN');
+              }}
+              className="w-full accent-emerald-500 cursor-pointer"
+            />
+            <button
+              onClick={() => handlePtzZoomChange(0.5)}
+              className="px-2.5 py-1 rounded-lg bg-[#0E1A14] hover:bg-[#16291E] text-gray-300 font-bold active:scale-95"
+            >
+              +
+            </button>
+          </div>
+        </div>
+
+        {/* Foco (Ajusta nitidez/blur em tempo real) */}
+        <div className="p-2 rounded-xl bg-[#070F0B] border border-[#16291E] space-y-1">
+          <div className="flex items-center justify-between text-[11px]">
+            <span className="text-gray-400">Foco / Lente:</span>
+            <strong className="text-emerald-400">{ptzFocus}% {ptzFocus === 50 ? '(Nítido)' : ''}</strong>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPtzFocus(f => Math.max(0, f - 10))}
+              className="px-2.5 py-1 rounded-lg bg-[#0E1A14] hover:bg-[#16291E] text-gray-300 font-bold active:scale-95"
+            >
+              -
+            </button>
+            <input
+              type="range"
+              min="0"
+              max="100"
+              step="5"
+              value={ptzFocus}
+              onChange={e => setPtzFocus(Number(e.target.value))}
+              className="w-full accent-emerald-500 cursor-pointer"
+            />
+            <button
+              onClick={() => setPtzFocus(f => Math.min(100, f + 10))}
+              className="px-2.5 py-1 rounded-lg bg-[#0E1A14] hover:bg-[#16291E] text-gray-300 font-bold active:scale-95"
+            >
+              +
+            </button>
+          </div>
+        </div>
+
+        {/* Íris (Ajusta brilho/abertura em tempo real) */}
+        <div className="p-2 rounded-xl bg-[#070F0B] border border-[#16291E] space-y-1">
+          <div className="flex items-center justify-between text-[11px]">
+            <span className="text-gray-400">Íris / Abertura:</span>
+            <strong className="text-emerald-400">{ptzIris}%</strong>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPtzIris(i => Math.max(0, i - 10))}
+              className="px-2.5 py-1 rounded-lg bg-[#0E1A14] hover:bg-[#16291E] text-gray-300 font-bold active:scale-95"
+            >
+              -
+            </button>
+            <input
+              type="range"
+              min="0"
+              max="100"
+              step="5"
+              value={ptzIris}
+              onChange={e => setPtzIris(Number(e.target.value))}
+              className="w-full accent-emerald-500 cursor-pointer"
+            />
+            <button
+              onClick={() => setPtzIris(i => Math.min(100, i + 10))}
+              className="px-2.5 py-1 rounded-lg bg-[#0E1A14] hover:bg-[#16291E] text-gray-300 font-bold active:scale-95"
+            >
+              +
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  // Painel de Gravações & DVR
+  const renderRecordingsPanel = () => (
+    <div className="rounded-2xl bg-[#0A140F] border border-[#16291E] p-4 space-y-3 shadow-sm font-mono text-xs w-full">
+      <div className="flex items-center justify-between border-b border-[#16291E] pb-2">
+        <span className="font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+          <Film className="w-3.5 h-3.5 text-gray-400" />
+          <span>Gravação de Segurança</span>
+        </span>
+        <span className="text-[10px] text-emerald-400 font-bold">NVR ON</span>
+      </div>
+
+      <select
+        value={recordingPeriod}
+        onChange={e => setRecordingPeriod(e.target.value)}
+        className="w-full bg-[#070F0B] border border-[#16291E] rounded-xl px-3 py-2 text-gray-300 outline-none text-xs focus:border-emerald-500/60"
+      >
+        <option value="24h">Últimas 24 horas</option>
+        <option value="6h">Últimas 6 horas</option>
+        <option value="1h">Última 1 hora</option>
+        <option value="15m">Últimos 15 minutos</option>
+      </select>
+
+      <button
+        onClick={handleExportClip}
+        disabled={isDownloadingClip}
+        className="w-full py-2.5 rounded-xl bg-[#0E1A14] hover:bg-[#16291E] border border-emerald-700/60 hover:border-emerald-500 text-emerald-300 font-bold flex items-center justify-center gap-2 transition-all cursor-pointer"
+      >
+        <Download className="w-4 h-4" />
+        <span>{isDownloadingClip ? 'Exportando Evidência...' : 'Exportar Vídeo MP4'}</span>
+      </button>
+
+      <button
+        onClick={() => onSelectFunction?.('telao-integrado')}
+        className="w-full py-2 rounded-xl bg-[#070F0B] hover:bg-[#0E1A14] border border-[#16291E] text-gray-400 hover:text-white flex items-center justify-center gap-2 transition-colors cursor-pointer text-[11px]"
+      >
+        <Monitor className="w-3.5 h-3.5 text-emerald-400" />
+        <span>Entrar no Telão Sem HUD</span>
+      </button>
+    </div>
+  );
 
   // =========================================================================
   // MODO TELÃO SEM HUD (Acoplado diretamente com retorno limpo)
@@ -754,121 +1158,16 @@ export const CameraAnalyticsScreen: React.FC<CameraAnalyticsScreenProps> = ({
         /* -------------------------------------------------------------------
             MODO C: FOCO PTZ & ZOOM (LAYOUT DE 3 COLUNAS - REFERÊNCIA DO USUÁRIO)
            ------------------------------------------------------------------- */
-        <div className="flex-1 min-h-0 grid grid-cols-12 gap-3.5 overflow-hidden">
-          {/* COLUNA ESQUERDA: DIRETÓRIO DE SETORES & STATUS */}
-          <div className="col-span-12 md:col-span-3 lg:col-span-3 xl:col-span-2 rounded-2xl bg-[#0A140F] border border-[#16291E] p-3 flex flex-col justify-between overflow-hidden shadow-sm">
-            <div className="space-y-2.5 flex-1 min-h-0 flex flex-col">
-              {/* Campo de Busca com Botão de Limpar */}
-              <div className="relative shrink-0">
-                <Search className="w-3.5 h-3.5 text-gray-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  placeholder="Buscar câmera..."
-                  value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
-                  className="w-full pl-8 pr-7 py-1.5 bg-[#070F0B] border border-[#16291E] rounded-xl text-xs font-mono text-gray-200 placeholder-gray-600 outline-none focus:border-emerald-500/60"
-                />
-                {searchQuery && (
-                  <button
-                    onClick={() => setSearchQuery('')}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                )}
-              </div>
-
-              {/* Lista Interativa de Setores */}
-              <div className="flex-1 min-h-0 overflow-y-auto space-y-1 pr-1 font-mono text-xs">
-                {sectorsList.map(sec => {
-                  const SecIcon = sec.icon;
-                  const isSelected = selectedSectorFilter === sec.id;
-
-                  return (
-                    <button
-                      key={sec.id}
-                      onClick={() => {
-                        soundAndVoice.playAlertSound('beep');
-                        setSelectedSectorFilter(isSelected ? 'TODOS' : sec.id);
-                        // Se houver câmeras nesse setor, seleciona a primeira
-                        const inSector = cameras.find(c => sec.id === 'TODOS' || getCameraSectorCategory(c) === sec.id);
-                        if (inSector) onSelectCamera(inSector.id);
-                      }}
-                      className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs transition-all cursor-pointer ${
-                        isSelected
-                          ? 'bg-emerald-950/60 text-emerald-300 font-bold border border-emerald-700/60 shadow-[0_0_10px_rgba(16,185,129,0.2)]'
-                          : 'text-gray-300 hover:text-white hover:bg-[#0E1A14] border border-transparent'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2 truncate">
-                        <SecIcon className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                        <span className="truncate">{sec.label}</span>
-                      </div>
-                      <span className="text-[10px] bg-[#070F0B] border border-[#16291E] px-1.5 py-0.2 rounded font-mono text-gray-400 shrink-0">
-                        {sec.count}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Status da Planta */}
-            <div className="pt-2.5 border-t border-[#16291E] space-y-1.5 shrink-0 font-mono text-[11px]">
-              <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block px-1">
-                Status da Infraestrutura
-              </span>
-              <div className="flex items-center justify-between px-1 text-gray-300">
-                <span className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                  <span>Câmeras Online</span>
-                </span>
-                <span className="font-bold text-emerald-400">
-                  {cameras.filter(c => c.status === 'ONLINE').length}
-                </span>
-              </div>
-              <div className="flex items-center justify-between px-1 text-gray-300">
-                <span className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-rose-500" />
-                  <span>Alertas / Invasão</span>
-                </span>
-                <span className="font-bold text-rose-400">
-                  {cameras.filter(c => c.status === 'ALERTA').length}
-                </span>
-              </div>
-              <div className="flex items-center justify-between px-1 text-gray-300">
-                <span className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-gray-500" />
-                  <span>API REST</span>
-                </span>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[10px] text-emerald-400 font-bold">
-                    {apiConfig.status}
-                  </span>
-                  <button
-                    onClick={() => setShowApiModal(true)}
-                    className="p-1 rounded hover:bg-[#16291E] text-gray-400 hover:text-emerald-400 transition-colors cursor-pointer"
-                    title="Configurações da API REST & NVR"
-                  >
-                    <Server className="w-3 h-3" />
-                  </button>
-                </div>
-              </div>
-
-              <button
-                onClick={() => setShowAddModal(true)}
-                className="w-full mt-1 py-1.5 rounded-xl bg-[#0E1A14] hover:bg-[#16291E] border border-emerald-800/40 text-emerald-300 text-[10px] font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-              >
-                <Plus className="w-3 h-3" />
-                <span>Alocar Câmera</span>
-              </button>
-            </div>
+        <div className="flex-1 min-h-0 grid grid-cols-12 gap-3 sm:gap-3.5 overflow-y-auto md:overflow-hidden">
+          {/* COLUNA ESQUERDA (DESKTOP): DIRETÓRIO DE SETORES & STATUS */}
+          <div className="hidden md:flex md:col-span-3 lg:col-span-3 xl:col-span-2 overflow-hidden h-full">
+            {renderSectorsPanel()}
           </div>
 
-          {/* COLUNA CENTRAL: PLAYER PRINCIPAL + CARROSSEL DE MINIATURAS */}
-          <div className="col-span-12 md:col-span-9 lg:col-span-6 xl:col-span-7 flex flex-col gap-3 min-h-0 overflow-hidden">
+          {/* COLUNA CENTRAL: PLAYER PRINCIPAL + CARROSSEL DE MINIATURAS + CONTROLES MOBILE */}
+          <div className="col-span-12 md:col-span-9 lg:col-span-6 xl:col-span-7 flex flex-col gap-2.5 sm:gap-3 min-h-0 overflow-y-auto md:overflow-hidden">
             {/* Player de Vídeo Principal com Controles Físicos */}
-            <div className="flex-1 min-h-0 rounded-2xl bg-[#0A140F] border border-[#16291E] flex flex-col overflow-hidden shadow-xl">
+            <div className="min-h-[220px] xs:min-h-[260px] sm:min-h-[320px] md:min-h-0 flex-1 rounded-2xl bg-[#0A140F] border border-[#16291E] flex flex-col overflow-hidden shadow-xl shrink-0">
               {/* Barra do Player */}
               <div className="h-10 px-3.5 bg-[#070F0B]/80 border-b border-[#16291E] flex items-center justify-between shrink-0 font-mono text-xs">
                 <div className="flex items-center gap-2 truncate">
@@ -942,6 +1241,10 @@ export const CameraAnalyticsScreen: React.FC<CameraAnalyticsScreenProps> = ({
                 onMouseUp={handleFeedMouseUp}
                 onMouseLeave={handleFeedMouseUp}
                 onWheel={handleFeedWheel}
+                onTouchStart={handleFeedTouchStart}
+                onTouchMove={handleFeedTouchMove}
+                onTouchEnd={handleFeedTouchEnd}
+                onTouchCancel={handleFeedTouchEnd}
                 title="Clique e arraste para movimentar a câmera • Roda do mouse para Zoom"
               >
                 <img
@@ -1089,259 +1392,70 @@ export const CameraAnalyticsScreen: React.FC<CameraAnalyticsScreenProps> = ({
                 </span>
               </div>
             </div>
+            {/* CONTROLES EXCLUSIVOS MOBILE (TABS & PAINEL ATIVO) */}
+            <div className="flex md:hidden flex-col gap-2.5 shrink-0 pt-1 pb-4">
+              {/* Barra Segmentada de Seleção de Painel */}
+              <div className="flex items-center justify-between bg-[#070F0B] p-1 rounded-xl border border-[#16291E] shrink-0 text-xs font-mono">
+                <button
+                  type="button"
+                  onClick={() => {
+                    soundAndVoice.playAlertSound('beep');
+                    setMobileZoomTab('PTZ');
+                  }}
+                  className={`flex-1 py-1.5 px-2 rounded-lg font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                    mobileZoomTab === 'PTZ'
+                      ? 'bg-emerald-500 text-black shadow-sm'
+                      : 'text-gray-400 hover:text-white'
+                  }`}
+                >
+                  <Sliders className="w-3.5 h-3.5" />
+                  <span>PTZ D-Pad</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    soundAndVoice.playAlertSound('beep');
+                    setMobileZoomTab('SETORES');
+                  }}
+                  className={`flex-1 py-1.5 px-2 rounded-lg font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                    mobileZoomTab === 'SETORES'
+                      ? 'bg-emerald-500 text-black shadow-sm'
+                      : 'text-gray-400 hover:text-white'
+                  }`}
+                >
+                  <Search className="w-3.5 h-3.5" />
+                  <span>Câmeras</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    soundAndVoice.playAlertSound('beep');
+                    setMobileZoomTab('GRAVACOES');
+                  }}
+                  className={`flex-1 py-1.5 px-2 rounded-lg font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                    mobileZoomTab === 'GRAVACOES'
+                      ? 'bg-emerald-500 text-black shadow-sm'
+                      : 'text-gray-400 hover:text-white'
+                  }`}
+                >
+                  <Film className="w-3.5 h-3.5" />
+                  <span>DVR Clipe</span>
+                </button>
+              </div>
+
+              {/* Conteúdo do Painel Ativo no Celular */}
+              <div className="w-full">
+                {mobileZoomTab === 'PTZ' && renderPtzConsolePanel()}
+                {mobileZoomTab === 'SETORES' && renderSectorsPanel()}
+                {mobileZoomTab === 'GRAVACOES' && renderRecordingsPanel()}
+              </div>
+            </div>
           </div>
 
-          {/* COLUNA DIREITA: CONSOLE PTZ COMPLETO + GRAVAÇÕES */}
-          <div className="col-span-12 md:col-span-12 lg:col-span-3 xl:col-span-3 flex flex-col gap-3.5 min-h-0 overflow-y-auto">
-            {/* CARD 1: CONTROLE PTZ INDUSTRIAL */}
-            <div className="rounded-2xl bg-[#0A140F] border border-[#16291E] p-4 flex flex-col items-center justify-between space-y-4 shadow-sm">
-              <div className="w-full flex items-center justify-between border-b border-[#16291E] pb-2 font-mono text-xs">
-                <span className="font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
-                  <Sliders className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Controle PTZ</span>
-                </span>
-                
-                <div className="flex items-center gap-1.5">
-                  {/* Seletor Segmentado de Modo de Eixos PTZ */}
-                  <div className="flex items-center gap-1 bg-[#070F0B] p-0.5 rounded-lg border border-[#16291E] text-[10px]">
-                    <button
-                      onClick={() => {
-                        setInvertControls(false);
-                        soundAndVoice.playAlertSound('beep');
-                        showPtzFeedback('EIXOS: MODO DIRETO');
-                      }}
-                      className={`px-2 py-0.5 rounded font-bold transition-all cursor-pointer ${
-                        !invertControls
-                          ? 'bg-emerald-500 text-black shadow-sm'
-                          : 'text-gray-400 hover:text-white'
-                      }`}
-                      title="Movimento Direto: clicar na seta move a imagem diretamente para aquele lado"
-                    >
-                      Direto
-                    </button>
-                    <button
-                      onClick={() => {
-                        setInvertControls(true);
-                        soundAndVoice.playAlertSound('beep');
-                        showPtzFeedback('EIXOS: MODO INVERTIDO');
-                      }}
-                      className={`px-2 py-0.5 rounded font-bold transition-all cursor-pointer ${
-                        invertControls
-                          ? 'bg-amber-500 text-black shadow-sm'
-                          : 'text-gray-400 hover:text-white'
-                      }`}
-                      title="Movimento Invertido: simulação de rotação física da lente PTZ / drone"
-                    >
-                      Invertido
-                    </button>
-                  </div>
-
-                  <span className="text-[10px] text-emerald-400 font-bold">
-                    {selectedCam.id}
-                  </span>
-                </div>
-              </div>
-
-              {/* D-Pad Circular Industrial com Coordenadas */}
-              <div className="flex flex-col items-center gap-1.5">
-                <div className="relative w-36 h-36 rounded-full border-2 border-[#16291E] bg-[#070F0B] flex items-center justify-center shadow-inner">
-                  {/* Cima */}
-                  <button
-                    onClick={() => handlePtzMove('UP')}
-                    className="absolute top-1 p-2 rounded-full hover:bg-emerald-500/20 text-gray-400 hover:text-emerald-300 transition-colors cursor-pointer"
-                    title="Inclinar para Cima (Tilt Up • Seta ↑)"
-                  >
-                    <ChevronUp className="w-5 h-5" />
-                  </button>
-
-                  {/* Esquerda */}
-                  <button
-                    onClick={() => handlePtzMove('LEFT')}
-                    className="absolute left-1 p-2 rounded-full hover:bg-emerald-500/20 text-gray-400 hover:text-emerald-300 transition-colors cursor-pointer"
-                    title="Panorâmica para Esquerda (Pan Left • Seta ←)"
-                  >
-                    <ChevronLeft className="w-5 h-5" />
-                  </button>
-
-                  {/* Botão Central OK (Home Preset) */}
-                  <button
-                    onClick={() => handlePtzMove('OK')}
-                    className="w-12 h-12 rounded-full bg-[#0E1A14] border border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/20 font-mono font-bold text-xs flex items-center justify-center shadow-md transition-all cursor-pointer"
-                    title="Redefinir Posição Home / Zoom 1.0x (Tecla R / Espaço)"
-                  >
-                    OK
-                  </button>
-
-                  {/* Direita */}
-                  <button
-                    onClick={() => handlePtzMove('RIGHT')}
-                    className="absolute right-1 p-2 rounded-full hover:bg-emerald-500/20 text-gray-400 hover:text-emerald-300 transition-colors cursor-pointer"
-                    title="Panorâmica para Direita (Pan Right • Seta →)"
-                  >
-                    <ChevronRight className="w-5 h-5" />
-                  </button>
-
-                  {/* Baixo */}
-                  <button
-                    onClick={() => handlePtzMove('DOWN')}
-                    className="absolute bottom-1 p-2 rounded-full hover:bg-emerald-500/20 text-gray-400 hover:text-emerald-300 transition-colors cursor-pointer"
-                    title="Inclinar para Baixo (Tilt Down • Seta ↓)"
-                  >
-                    <ChevronDown className="w-5 h-5" />
-                  </button>
-                </div>
-
-                <div className="font-mono text-[10px] text-gray-400 flex items-center gap-3">
-                  <span>PAN: <strong className="text-emerald-400">{(ptzPan.x / 3).toFixed(0)}° {ptzPan.x > 0 ? '(D)' : ptzPan.x < 0 ? '(E)' : ''}</strong></span>
-                  <span>•</span>
-                  <span>TILT: <strong className="text-emerald-400">{(-ptzPan.y / 3).toFixed(0)}° {ptzPan.y < 0 ? '(↑)' : ptzPan.y > 0 ? '(↓)' : ''}</strong></span>
-                </div>
-                <div className="text-[9px] text-gray-500 font-mono text-center">
-                  Setas ↑↓←→ • Arraste o vídeo com o mouse • R/Espaço para reset
-                </div>
-              </div>
-
-              {/* Sliders Reais de Zoom, Foco e Íris */}
-              <div className="w-full space-y-2.5 font-mono text-xs">
-                {/* Zoom */}
-                <div className="p-2 rounded-xl bg-[#070F0B] border border-[#16291E] space-y-1">
-                  <div className="flex items-center justify-between text-[11px]">
-                    <span className="text-gray-400">Zoom Digital:</span>
-                    <strong className="text-emerald-400">{ptzZoom}x</strong>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => handlePtzZoomChange(-0.5)}
-                      className="px-2 py-0.5 rounded bg-[#0E1A14] hover:bg-[#16291E] text-gray-300 font-bold"
-                    >
-                      -
-                    </button>
-                    <input
-                      type="range"
-                      min="1.0"
-                      max="4.0"
-                      step="0.1"
-                      value={ptzZoom}
-                      onChange={e => {
-                        setPtzZoom(Number(e.target.value));
-                        copperGuardApi.sendPtzCommand(selectedCam.id, 'ZOOM_IN');
-                      }}
-                      className="w-full accent-emerald-500 cursor-pointer"
-                    />
-                    <button
-                      onClick={() => handlePtzZoomChange(0.5)}
-                      className="px-2 py-0.5 rounded bg-[#0E1A14] hover:bg-[#16291E] text-gray-300 font-bold"
-                    >
-                      +
-                    </button>
-                  </div>
-                </div>
-
-                {/* Foco (Ajusta nitidez/blur em tempo real) */}
-                <div className="p-2 rounded-xl bg-[#070F0B] border border-[#16291E] space-y-1">
-                  <div className="flex items-center justify-between text-[11px]">
-                    <span className="text-gray-400">Foco / Lente:</span>
-                    <strong className="text-emerald-400">{ptzFocus}% {ptzFocus === 50 ? '(Nítido)' : ''}</strong>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setPtzFocus(f => Math.max(0, f - 10))}
-                      className="px-2 py-0.5 rounded bg-[#0E1A14] hover:bg-[#16291E] text-gray-300 font-bold"
-                    >
-                      -
-                    </button>
-                    <input
-                      type="range"
-                      min="0"
-                      max="100"
-                      step="5"
-                      value={ptzFocus}
-                      onChange={e => setPtzFocus(Number(e.target.value))}
-                      className="w-full accent-emerald-500 cursor-pointer"
-                    />
-                    <button
-                      onClick={() => setPtzFocus(f => Math.min(100, f + 10))}
-                      className="px-2 py-0.5 rounded bg-[#0E1A14] hover:bg-[#16291E] text-gray-300 font-bold"
-                    >
-                      +
-                    </button>
-                  </div>
-                </div>
-
-                {/* Íris (Ajusta brilho/abertura em tempo real) */}
-                <div className="p-2 rounded-xl bg-[#070F0B] border border-[#16291E] space-y-1">
-                  <div className="flex items-center justify-between text-[11px]">
-                    <span className="text-gray-400">Íris / Abertura:</span>
-                    <strong className="text-emerald-400">{ptzIris}%</strong>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setPtzIris(i => Math.max(0, i - 10))}
-                      className="px-2 py-0.5 rounded bg-[#0E1A14] hover:bg-[#16291E] text-gray-300 font-bold"
-                    >
-                      -
-                    </button>
-                    <input
-                      type="range"
-                      min="0"
-                      max="100"
-                      step="5"
-                      value={ptzIris}
-                      onChange={e => setPtzIris(Number(e.target.value))}
-                      className="w-full accent-emerald-500 cursor-pointer"
-                    />
-                    <button
-                      onClick={() => setPtzIris(i => Math.min(100, i + 10))}
-                      className="px-2 py-0.5 rounded bg-[#0E1A14] hover:bg-[#16291E] text-gray-300 font-bold"
-                    >
-                      +
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* CARD 2: GRAVAÇÃO & DOWNLOAD DE CLIPE */}
-            <div className="rounded-2xl bg-[#0A140F] border border-[#16291E] p-4 space-y-3 shadow-sm font-mono text-xs">
-              <div className="flex items-center justify-between border-b border-[#16291E] pb-2">
-                <span className="font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
-                  <Film className="w-3.5 h-3.5 text-gray-400" />
-                  <span>Gravação de Segurança</span>
-                </span>
-                <span className="text-[10px] text-emerald-400">NVR ON</span>
-              </div>
-
-              {/* Dropdown de Intervalo */}
-              <select
-                value={recordingPeriod}
-                onChange={e => setRecordingPeriod(e.target.value)}
-                className="w-full bg-[#070F0B] border border-[#16291E] rounded-xl px-3 py-2 text-gray-300 outline-none text-xs focus:border-emerald-500/60"
-              >
-                <option value="24h">Últimas 24 horas</option>
-                <option value="6h">Últimas 6 horas</option>
-                <option value="1h">Última 1 hora</option>
-                <option value="15m">Últimos 15 minutos</option>
-              </select>
-
-              {/* Botão Baixar Clipe */}
-              <button
-                onClick={handleExportClip}
-                disabled={isDownloadingClip}
-                className="w-full py-2.5 rounded-xl bg-[#0E1A14] hover:bg-[#16291E] border border-emerald-700/60 hover:border-emerald-500 text-emerald-300 font-bold flex items-center justify-center gap-2 transition-all cursor-pointer"
-              >
-                <Download className="w-4 h-4" />
-                <span>{isDownloadingClip ? 'Exportando Evidência...' : 'Exportar Vídeo MP4'}</span>
-              </button>
-
-              {/* Botão Atalho Telão */}
-              <button
-                onClick={() => onSelectFunction?.('telao-integrado')}
-                className="w-full py-2 rounded-xl bg-[#070F0B] hover:bg-[#0E1A14] border border-[#16291E] text-gray-400 hover:text-white flex items-center justify-center gap-2 transition-colors cursor-pointer text-[11px]"
-              >
-                <Monitor className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Entrar no Telão Sem HUD</span>
-              </button>
-            </div>
+          {/* COLUNA DIREITA (DESKTOP): CONSOLE PTZ COMPLETO + GRAVAÇÕES */}
+          <div className="hidden md:flex md:col-span-12 lg:col-span-3 xl:col-span-3 flex-col gap-3.5 min-h-0 overflow-y-auto">
+            {renderPtzConsolePanel()}
+            {renderRecordingsPanel()}
           </div>
         </div>
       )}
